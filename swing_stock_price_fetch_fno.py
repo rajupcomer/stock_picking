@@ -10,12 +10,12 @@ from telegram import Bot, error
 
 
 # Function to fetch stock prices
-def fetch_stock_prices(stock_names, live, file_name):
+def fetch_stock_prices(stock_names, live, file_name,upside_bo_msg_list, downside_bo_msg_list):
     
     for stock_info in stock_names:
         #print (stock_info)
         updated_rows = []
-        stock_name, high_price, low_price, is_enable = stock_info
+        stock_name, high_price, low_price, is_enable, comment = stock_info
         try:
             if live:
             	stock_data = yf.download(stock_name, start=datetime.now(), end=datetime.now())
@@ -29,20 +29,22 @@ def fetch_stock_prices(stock_names, live, file_name):
                 
                 is_enable = 'TRUE'
                 if current_price >= float(high_price):
-                    message = f"""  <b> {stock_name} </b> - Current price crossed the <b> HIGH </b> price of {high_price}  🟢 \U0001F31F """
+                    message = f"""  <b> {stock_name} </b> - crossed <b> HIGH </b> price of {high_price} \n"""
                     send_notification(message)
-                    asyncio.run(tgmain(message))
+                    #asyncio.run(tgmain(message))
+                    upside_bo_msg_list.append(message)
                     is_enable = 'FALSE'
                 elif current_price <= float(low_price):
-                    message = f""" <b> {stock_name} </b> - Current price crossed the <b> LOW </b> price of {low_price}  🟢⬆️  \U0001F31F """
+                    message = f""" <b> {stock_name} </b> - crossed  <b> LOW </b> price of {low_price} \n"""
                     send_notification(message)
-                    asyncio.run(tgmain(message))
+                    #asyncio.run(tgmain(message))
+                    downside_bo_msg_list.append(message)
                     is_enable = 'FALSE'
 
-                updated_rows.append([stock_name, high_price, low_price, is_enable])
+                updated_rows.append([stock_name, high_price, low_price, is_enable,comment])
             else:
                 print(f"Stock: {stock_name}, Data not available")
-                updated_rows.append([stock_name, high_price, low_price, is_enable])
+                updated_rows.append([stock_name, high_price, low_price, is_enable,comment])
                           
         except Exception as e:
             print(f"Error fetching data for {stock_name}: {e}")
@@ -53,7 +55,7 @@ def fetch_stock_prices(stock_names, live, file_name):
     
     with open(file_name, 'w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(['SCRIP', 'High Price', 'Low Price', 'EnaBle'])  # Rewrite the header
+        writer.writerow(['SCRIP', 'High Price', 'Low Price', 'EnaBle','Comment'])  # Rewrite the header
         writer.writerows(updated_rows)
         file.writelines(lines[len(updated_rows)+1:])  # Write the skipped lines back to the file
 
@@ -110,12 +112,19 @@ def main():
 
     # Run until 3:30 PM IST
     end_time = datetime.combine(datetime.now().date(), time(hour=15, minute=30))
+    start_time = datetime.combine(datetime.now().date(), time(hour=00, minute=15))
 
     no_of_exec = 1
     while datetime.now() < end_time:
-        message = f""" No of Execution for the day(Today) - {no_of_exec} """
+        upside_bo_msg_list = []
+        downside_bo_msg_list = []
+        
+        #asyncio.run(tgmain(message))
+        fetch_stock_prices(stock_names, live=True, file_name=stock_file, upside_bo_msg_list=upside_bo_msg_list, 					downside_bo_msg_list=downside_bo_msg_list )
+        message_up = f""" No of Execution for the day - {no_of_exec} \n\n ======Upside Breakout====== \n\n """ + "\n".join(upside_bo_msg_list) 
+        message_down = """ \n ======Downside Breakout====== \n\n""" + "\n".join(downside_bo_msg_list)
+        message =  message_up + message_down
         asyncio.run(tgmain(message))
-        fetch_stock_prices(stock_names, live=True, file_name=stock_file)
         print ("\n\n===========================================")
         print ("==== Waiting for another 5 Minutes  ======")
         print ("===========================================\n\n")
@@ -124,7 +133,15 @@ def main():
         
     print (" Market will open at 9:15 am ")
     print ("==== We will find our zone using today/yesterday closed price =====")
-    fetch_stock_prices(stock_names, live=False, file_name=stock_file) 
+    upside_bo_msg_list = []
+    downside_bo_msg_list = []
+    fetch_stock_prices(stock_names, live=False, file_name=stock_file, upside_bo_msg_list=upside_bo_msg_list, 					downside_bo_msg_list=downside_bo_msg_list )
+    message = f""" No of Execution for the day - {no_of_exec} \n\n ======Upside Breakout====== \n\n """ \
+    			 + "\n".join(upside_bo_msg_list) +  \
+    			 "\n ======Downside Breakout====== \n\n"+ "\n".join(downside_bo_msg_list)
+    			 
+    print (message)
+    asyncio.run(tgmain(message))
 
 if __name__ == "__main__":
     main()
