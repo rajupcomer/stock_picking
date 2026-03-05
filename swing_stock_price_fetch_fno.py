@@ -13,29 +13,36 @@ from telegram import Bot, error
 def fetch_stock_prices(stock_names, live, file_name,upside_bo_msg_list, downside_bo_msg_list):
     
     for stock_info in stock_names:
+        t.sleep(2)
         #print (stock_info)
         updated_rows = []
         stock_name, high_price, low_price, is_enable, comment = stock_info
         try:
             if live:
-            	stock_data = yf.download(stock_name, start=datetime.now(), end=datetime.now())
+                #stock_data = yf.download(stock_name, start=datetime.now(), end=datetime.now(), auto_adjust=True)
+                stock_data = yf.download(stock_name, period='1d', auto_adjust=True)
             else:
-            	stock_data = yf.download(stock_name)
+                stock_data = yf.download(stock_name, period='1d', auto_adjust=True)
+            print (stock_data)
+            print ("*********************************")
             if not stock_data.empty:
-                print(f"Stock: {stock_name}, Price: {stock_data['Adj Close'].iloc[-1]}")
+
+                print(f"Stock: {stock_name}, Price: {stock_data['Close'].iloc[-1]}")
                 #current_price = stock.history(period="1d")['Close'].iloc[-1]
-                current_price = stock_data['Adj Close'].iloc[-1]
-                
+                current_price = stock_data['Close'][stock_name].iloc[-1]
+                print (float(current_price))
+                print (type(current_price))
+                print ("////////////////////////////////")
                 
                 is_enable = 'TRUE'
-                if current_price >= float(high_price):
-                    message = f"""  <b> {stock_name} </b> - crossed <b> HIGH </b> price of {high_price} \n"""
+                if float(current_price) >= float(high_price):
+                    message = f"""  <b> {stock_name} </b> - crossed <b> HIGH </b> price of {high_price} \n Note: {comment} \n """
                     send_notification(message)
                     #asyncio.run(tgmain(message))
                     upside_bo_msg_list.append(message)
                     is_enable = 'FALSE'
-                elif current_price <= float(low_price):
-                    message = f""" <b> {stock_name} </b> - crossed  <b> LOW </b> price of {low_price} \n"""
+                elif float(current_price) <= float(low_price):
+                    message = f""" <b> {stock_name} </b> - crossed  <b> LOW </b> price of {low_price} \n Note: {comment} \n """
                     send_notification(message)
                     #asyncio.run(tgmain(message))
                     downside_bo_msg_list.append(message)
@@ -45,7 +52,7 @@ def fetch_stock_prices(stock_names, live, file_name,upside_bo_msg_list, downside
             else:
                 print(f"Stock: {stock_name}, Data not available")
                 updated_rows.append([stock_name, high_price, low_price, is_enable,comment])
-                          
+            t.sleep(2)             
         except Exception as e:
             print(f"Error fetching data for {stock_name}: {e}")
 
@@ -70,7 +77,7 @@ def read_stock_names(file_name):
             #stock_names.extend(row)
             #print (row[3])
             if row[3] == 'TRUE':
-            	stock_names.append(row)
+                stock_names.append(row)
     return stock_names
 
 # Function to send notification
@@ -105,14 +112,19 @@ async def tgmain(message):
 # Main function
 def main():
     # File containing stock names
-    stock_file = 'swing_stock_fno_list.csv'
+    # F&O Stock list
+    #stock_file = 'swing_stock_fno_list.csv'
+    # CIS Break out list
+    #stock_file = 'breakout_watchlist.csv'
+    # Index VRZ Zone for option Selling
+    stock_file = 'index_VRZ_BOF_levels.csv'
 
     # Read stock names from CSV file
     stock_names = read_stock_names(stock_file)
 
     # Run until 3:30 PM IST
     end_time = datetime.combine(datetime.now().date(), time(hour=15, minute=30))
-    start_time = datetime.combine(datetime.now().date(), time(hour=00, minute=15))
+    start_time = datetime.combine(datetime.now().date(), time(hour=9, minute=15))
 
     no_of_exec = 1
     while datetime.now() < end_time:
